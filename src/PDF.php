@@ -6,8 +6,8 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Exception;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Contracts\View\Factory as ViewFactory;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\View\Factory as ViewFactory;
+use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Http\Response;
 
 /**
