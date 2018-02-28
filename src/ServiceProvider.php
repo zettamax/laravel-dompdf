@@ -1,6 +1,7 @@
 <?php
 namespace Barryvdh\DomPDF;
 
+use Dompdf\Dompdf;
 use Exception;
 use Illuminate\Support\ServiceProvider as IlluminateServiceProvider;
 
@@ -23,31 +24,29 @@ class ServiceProvider extends IlluminateServiceProvider {
     {
         $this->app['config']->package('barryvdh/laravel-dompdf', __DIR__ . '/config');
 
-        $defines = $this->app['config']->get('laravel-dompdf::defines') ?: array();
-        foreach ($defines as $key => $value) {
-            $this->define($key, $value);
-        }
+        $this->app->bind('dompdf.options', function($app){
+            $defines = $app['config']->get('laravel-dompdf::defines');
+            if ($defines) {
+                $options = [];
+                foreach ($defines as $key => $value) {
+                    $key = strtolower(str_replace('DOMPDF_', '', $key));
+                    $options[$key] = $value;
+                }
+            } else {
+                $options = $app['config']->get('laravel-dompdf::options');
+            }
+            return $options;
+        });
 
-        //Still load these values, in case config is not used.
-        $this->define("DOMPDF_ENABLE_REMOTE", true);
-        $this->define("DOMPDF_ENABLE_AUTOLOAD", false);
-        $this->define("DOMPDF_CHROOT", $this->app['path.base']);
-        $this->define("DOMPDF_LOG_OUTPUT_FILE", $this->app['path.storage'] . '/logs/dompdf.html');
+        $this->app->bind('dompdf', function($app) {
+            $options = $app->make('dompdf.options');
+            $dompdf = new Dompdf($options);
+            $dompdf->setBasePath(realpath(base_path('public')));
+            return $dompdf;
+        });
 
-        $config_file = $this->app['config']->get(
-            'laravel-dompdf::config_file'
-        ) ?: $this->app['path.base'] . '/vendor/dompdf/dompdf/dompdf_config.inc.php';
-
-        if (file_exists($config_file)) {
-            require_once $config_file;
-        } else {
-            throw new Exception(
-                "$config_file cannot be loaded, please configure correct config file (config.php: config_file)"
-            );
-        }
-        
-        $this->app->bind('dompdf', function ($app) {
-                return new PDF($app['config'], $app['files'], $app['view'], $app['path.public']);
+        $this->app->bind('dompdf.wrapper', function ($app) {
+                return new PDF($app['dompdf'], $app['config'], $app['files'], $app['view']);
             });
     }
 
@@ -58,20 +57,7 @@ class ServiceProvider extends IlluminateServiceProvider {
      */
     public function provides()
     {
-        return array('dompdf');
-    }
-
-    /**
-     * Define a value, if not already defined
-     * 
-     * @param string $name
-     * @param string $value
-     */
-    protected function define($name, $value)
-    {
-        if (!defined($name)) {
-            define($name, $value);
-        }
+        return array('dompdf', 'dompdf.wrapper', 'dompdf.options');
     }
 
 }
